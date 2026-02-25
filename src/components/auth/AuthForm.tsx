@@ -28,6 +28,8 @@ export default function AuthForm() {
         const fetchEmployees = async () => {
             console.log('--- Debug de Conexión ---')
             console.log('URL de Supabase configurada:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
+            console.log('Tabla destino:', 'Personal app moldes')
+
             try {
                 const { data, error } = await supabase
                     .from('Personal app moldes')
@@ -117,12 +119,26 @@ export default function AuthForm() {
 
     return (
         <div className="w-full max-w-md p-8 glass-card rounded-2xl animate-in fade-in duration-700">
-            <div className="flex flex-col items-center mb-8">
-                <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/30">
-                    <Settings className="w-8 h-8 text-blue-500 animate-spin-slow" />
+            <div className="flex flex-col items-center mb-10 text-center">
+                <div className="h-16 w-full flex items-center justify-center mb-6">
+                    <img
+                        src="/logo-firplak.png"
+                        alt="Firplak Logo"
+                        className="h-full object-contain filter drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]"
+                        onError={(e) => {
+                            // Fallback if image not found
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.parentElement!.innerHTML = '<span class="text-4xl font-black tracking-tighter text-white">FIRPLAK</span>';
+                        }}
+                    />
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight text-white mb-2">MoldApp</h1>
-                <p className="text-gray-400 text-sm italic">Acceso Personal Firplak</p>
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30">
+                        <Settings className="w-4 h-4 text-blue-500 animate-spin-slow" />
+                    </div>
+                    <h1 className="text-xl font-bold tracking-tight text-white uppercase tracking-wider">MoldApp</h1>
+                </div>
+                <p className="text-gray-500 text-[10px] uppercase tracking-[0.3em] mt-3 font-semibold">Control Interno de Producción</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-6">
