@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import MoldSearch from '@/components/molds/MoldSearch'
 import MoldDetails from '@/components/molds/MoldDetails'
-import { LogOut, Settings, User, MapPin, Briefcase, Factory, CheckCircle2, TrendingUp } from 'lucide-react'
+import Navbar from '@/components/layout/Navbar'
+import { Settings, Briefcase, Factory, CheckCircle2, TrendingUp } from 'lucide-react'
 
 export default function DashboardPage() {
     const [selectedMold, setSelectedMold] = useState<any>(null)
@@ -37,48 +38,18 @@ export default function DashboardPage() {
 
     return (
         <main className="min-h-screen bg-[#050505] text-white selection:bg-blue-500/30">
-            <nav className="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-12">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-                                <Settings className="w-6 h-6 text-white" />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xl font-black tracking-tighter leading-none">MoldApp</span>
-                                <span className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">Firplak S.A.</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-8">
-                        <div className="hidden lg:flex flex-col items-end text-right">
-                            <span className="text-sm font-bold text-white leading-none mb-1">{user?.Nombre}</span>
-                            <span className="text-[10px] text-gray-500 uppercase flex items-center gap-1">
-                                <MapPin className="w-3 h-3 text-blue-500" /> {user?.Planta || 'Sin Planta'}
-                            </span>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="group flex items-center gap-2 px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-sm font-bold border border-red-500/20 transition-all"
-                        >
-                            <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                            <span className="hidden sm:inline">Salir</span>
-                        </button>
-                    </div>
-                </div>
-            </nav>
+            <Navbar user={user} />
 
             <div className="max-w-7xl mx-auto px-6 py-12">
                 <div className="max-w-4xl mx-auto text-center mb-12 space-y-4">
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-[10px] font-bold uppercase tracking-widest animate-in fade-in slide-in-from-top-4 duration-1000">
-                        <CheckCircle2 className="w-3 h-3" /> Sistema de Control de Moldes Activo
+                        <CheckCircle2 className="w-3 h-3" /> Sistema Activo — {user?.Empresa || 'Firplak'}
                     </div>
                     <h1 className="text-5xl font-black tracking-tight text-white leading-[1.1]">
                         Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 font-extrabold">Control</span>
                     </h1>
-                    <p className="text-gray-500 text-lg max-w-2xl mx-auto leading-relaxed">
-                        Bienvenido, <span className="text-white font-medium">{user?.Nombre || 'Usuario'}</span>. Selecciona un módulo para comenzar.
+                    <p className="text-gray-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+                        Bienvenido, <span className="text-white font-medium">{user?.Nombre || user?.NombreCompleto}</span>. Tienes acceso a la base de datos de moldes de la planta <span className="text-blue-400 font-bold uppercase">{user?.Planta || 'Principal'}</span>.
                     </p>
                 </div>
 

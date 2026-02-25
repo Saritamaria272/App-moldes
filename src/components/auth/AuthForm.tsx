@@ -7,6 +7,9 @@ import { Search, Lock, Loader2, User, Settings, Check, ChevronDown } from 'lucid
 interface Employee {
     Cedula: number
     Nombre: string
+    Planta?: string
+    Area?: string
+    Empresa?: string
 }
 
 export default function AuthForm() {
@@ -28,11 +31,11 @@ export default function AuthForm() {
             console.log('Tabla destino:', 'Personal app moldes')
 
             try {
-                // Simplifying the query: No extra quotes, let Supabase JS handle it
                 const { data, error } = await supabase
                     .from('Personal app moldes')
                     .select('Nombre, Cedula')
                     .order('Nombre', { ascending: true })
+                    .limit(1000)
 
                 if (error) {
                     console.error('Error al cargar personal:', error)
@@ -133,7 +136,10 @@ export default function AuthForm() {
                     <div className="w-8 h-8 bg-blue-600/20 rounded-lg flex items-center justify-center border border-blue-500/30">
                         <Settings className="w-4 h-4 text-blue-500 animate-spin-slow" />
                     </div>
-                    <h1 className="text-xl font-bold tracking-tight text-white uppercase tracking-wider">MoldApp</h1>
+                    <h1 className="text-xl font-bold tracking-tight text-white uppercase tracking-wider flex items-center gap-2">
+                        MoldApp
+                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">V2.1</span>
+                    </h1>
                 </div>
                 <p className="text-gray-500 text-[10px] uppercase tracking-[0.3em] mt-3 font-semibold">Control Interno de Producción</p>
             </div>
@@ -183,6 +189,7 @@ export default function AuthForm() {
                                             >
                                                 <div>
                                                     <p className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">{emp.Nombre || 'Sin Nombre'}</p>
+                                                    <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{emp.Planta || 'MOLDES'} — {emp.Area || 'EXTERNO'}</p>
                                                 </div>
                                                 {selectedEmployee?.Cedula === emp.Cedula && (
                                                     <Check className="w-4 h-4 text-blue-500" />
