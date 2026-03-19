@@ -48,6 +48,21 @@ export const moldsService = {
         return data as Mold[]
     },
 
+    // Buscar moldes (Autocomplete)
+    async searchMolds(query: string) {
+        if (!query.trim()) return []
+        const supabase = createClient()
+        const term = `%${query.trim()}%`
+        const { data, error } = await supabase
+            .from('moldes')
+            .select('*')
+            .or(`nombre_articulo.ilike.${term},serial.ilike.${term}`)
+            .limit(10)
+            
+        if (error) return []
+        return data as Mold[]
+    },
+
     // Obtener catálogo de nombres de moldes existentes
     async getMoldsCatalog() {
         const supabase = createClient()
