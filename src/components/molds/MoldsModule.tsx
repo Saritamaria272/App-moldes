@@ -48,17 +48,20 @@ export default function MoldsModule() {
 
         let matchesRepair = true
         if (repairFilter !== 'TODO') {
-            const tipoRep = (m.Tipo_de_reparacion || '').toUpperCase()
-            const defectoStr = (m.Observaciones_reparacion || '').toUpperCase()
+            const estadoObj = (m.estado || '').toUpperCase()
+            // Ensure state is actually repairing and NOT disponible, en uso, destruido
+            const isRepairState = estadoObj.includes('REPARACION') || estadoObj.includes('ESPERA') || estadoObj === 'EN REPARACION'
+            const isInvalidState = estadoObj.includes('DESTRUIDO') || estadoObj.includes('DISPONIBLE') || estadoObj.includes('EN USO') || estadoObj.includes('ENTREGADO')
 
-            const isEspecial = tipoRep.includes('ESPECIAL') ||
-                              defectoStr.includes('NUEVO') ||
-                              defectoStr.includes('DESTRUCCION')
+            if (isInvalidState || !isRepairState) return false; // Force repair states only
+
+            const tipoRep = (m.Tipo_de_reparacion || '').toUpperCase()
+            const isEspecial = tipoRep.includes('ESPECIAL')
 
             if (repairFilter === 'REPARACION_ESPECIAL') {
                 matchesRepair = isEspecial
             } else if (repairFilter === 'REPARACION_RAPIDA') {
-                matchesRepair = !isEspecial
+                matchesRepair = tipoRep.includes('RAPIDA') || tipoRep === 'REPARACION RAPIDA'
             }
         }
 

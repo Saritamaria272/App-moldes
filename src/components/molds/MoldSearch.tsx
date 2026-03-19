@@ -12,36 +12,28 @@ export default function MoldSearch({ onSelect }: MoldSearchProps) {
     const [query, setQuery] = useState('')
     const [results, setResults] = useState<Mold[]>([])
     const [loading, setLoading] = useState(false)
-    const [allMolds, setAllMolds] = useState<Mold[]>([])
-
-    useEffect(() => {
-        const loadMolds = async () => {
-            try {
-                const data = await moldsService.getAll()
-                setAllMolds(data)
-            } catch (err) {
-                console.error(err)
-            }
-        }
-        loadMolds()
-    }, [])
-
+    
     useEffect(() => {
         if (!query.trim()) {
             setResults([])
             return
         }
-        const filtered = allMolds.filter(m => 
-            m.nombre_articulo?.toLowerCase().includes(query.toLowerCase()) ||
-            m.serial?.toLowerCase().includes(query.toLowerCase())
-        )
-        setResults(filtered.slice(0, 5))
-    }, [query, allMolds])
+        
+        setLoading(true)
+        const timeoutId = setTimeout(async () => {
+            const parsed = await moldsService.searchMolds(query)
+            setResults(parsed)
+            setLoading(false)
+        }, 400) // Debounce
+
+        return () => clearTimeout(timeoutId)
+    }, [query])
 
     return (
         <div className="relative w-full max-w-2xl mx-auto group">
             <div className="relative">
                 <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                {loading && <Loader2 className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500 animate-spin" />}
                 <input
                     type="text"
                     value={query}
