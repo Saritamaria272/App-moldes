@@ -31,3 +31,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Agents/Artifacts
+.tmp/
+.env
+.gemini/
+/brain/
+node_modules/
