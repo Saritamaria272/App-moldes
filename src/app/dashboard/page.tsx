@@ -6,7 +6,7 @@ import MoldSearch from '@/components/molds/MoldSearch'
 import AddMoldModal from '@/components/molds/AddMoldModal'
 import Navbar from '@/components/layout/Navbar'
 import SAPSessionBadge from '@/components/auth/SAPSessionBadge'
-import { Settings, Briefcase, Factory, CheckCircle2, TrendingUp } from 'lucide-react'
+import { Settings, Briefcase, Factory, CheckCircle2, TrendingUp, ClipboardList } from 'lucide-react'
 
 export default function DashboardPage() {
     const [selectedMold, setSelectedMold] = useState<any>(null)
@@ -60,7 +60,7 @@ export default function DashboardPage() {
                         <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
                             <Settings className="w-6 h-6 text-blue-500 dark:text-blue-400" />
                         </div>
-                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Moldes</span>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Histórico moldes</span>
                     </button>
 
                     <button
@@ -70,7 +70,7 @@ export default function DashboardPage() {
                         <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center border border-purple-500/20 group-hover:scale-110 transition-transform">
                             <Briefcase className="w-6 h-6 text-purple-500 dark:text-purple-400" />
                         </div>
-                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Registros de moldes</span>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Registro moldes</span>
                     </button>
 
                     <button
@@ -101,6 +101,15 @@ export default function DashboardPage() {
                             <TrendingUp className="w-6 h-6 text-red-500 dark:text-red-400" />
                         </div>
                         <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Indicador</span>
+                    </button>
+                    <button
+                        onClick={() => window.location.href = '/dashboard/audit-v2'}
+                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-cyan-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-cyan-500/5 group"
+                    >
+                        <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center border border-cyan-500/20 group-hover:scale-110 transition-transform">
+                            <ClipboardList className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
+                        </div>
+                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Auditoría V2</span>
                     </button>
                 </div>
 

@@ -22,8 +22,8 @@ export default function MoldsPage() {
                 user={user}
                 showBackButton
                 backPath="/dashboard"
-                title="Módulo Moldes"
-                subtitle="Gestión Activa"
+                title="Histórico de Moldes"
+                subtitle="Consulta de Trazabilidad"
             />
 
             {/* Content Container */}

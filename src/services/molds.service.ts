@@ -3,37 +3,23 @@ import { createClient, createClientTH } from '@/lib/supabase'
 export interface Mold {
     id?: number
     created_at?: string
-    modificado_desde?: string
-    modified_at?: string
-    vueltas_mto_atipicas?: number
-    Fecha_de_ingreso?: string
-    Fecha_de_entrega?: string
-    Fecha_esperada?: string
-    Estado_reparacion?: string
-    Tipo_de_reparacion?: string
-    estado: string
-    vueltas_actuales?: number
-    vueltas_acumuladas?: number
-    tipo_molde_id?: number
     serial: string
     nombre_articulo: string
-    descripcion_molde?: string
-    tipo_molde_sku?: string
-    Observaciones_reparacion?: string
+    estado: string
+    Responsable?: string
+    Tipo_de_reparacion?: string
+    Fecha_de_ingreso?: string
+    Fecha_esperada?: string
+    Fecha_de_entrega?: string
+    vueltas_actuales?: number
+    vueltas_acumuladas?: number
     observaciones?: string
     modificado_por?: string
-    Responsable?: string
-}
-
-export type MoldActive = any;
-
-export interface DefectItem {
-    Título: string
-    Tiempo: number | string
+    modified_at?: string
 }
 
 export const moldsService = {
-    // Retorna todos los registros de moldes
+    // Return all records from MASTER 'moldes' table
     async getAll() {
         const supabase = createClient()
         const { data, error } = await supabase
@@ -41,15 +27,39 @@ export const moldsService = {
             .select('*')
             .order('Fecha_esperada', { ascending: true })
 
-        if (error) {
-            console.error('Error in getAll:', error)
-            throw error
-        }
-        return data as Mold[]
+        if (error) throw error
+        return data
     },
 
-    // Buscar moldes (Autocomplete)
-    async searchMolds(query: string) {
+    // SEARCH: Registro Moldes module uses BD_moldes for searching/autocomplete
+    async searchRegistroMoldes(query: string) {
+        if (!query.trim()) return []
+        const supabase = createClient()
+        const term = `%${query.trim()}%`
+        // New exact column names: "Título", "CODIGO MOLDE"
+        const { data, error } = await supabase
+            .from('BD_moldes')
+            .select('*')
+            .or(`"Título".ilike.${term},"CODIGO MOLDE".ilike.${term}`)
+            .limit(15)
+            
+        if (error) {
+            console.error('Error searching BD_moldes:', error.message)
+            return []
+        }
+        // Map back to internal consistent names: titulo, codigo_molde
+        return (data || []).map((m: any) => ({
+            ...m,
+            id: m.id,
+            titulo: m["Título"],
+            codigo_molde: m["CODIGO MOLDE"],
+            defectos_a_reparar: m["DEFECTOS A REPARAR"],
+            estado: m["ESTADO"]
+        }))
+    },
+
+    // SEARCH: Master 'moldes' table still used for reference or creation
+    async searchMoldsMaster(query: string) {
         if (!query.trim()) return []
         const supabase = createClient()
         const term = `%${query.trim()}%`
@@ -60,63 +70,35 @@ export const moldsService = {
             .limit(10)
             
         if (error) return []
-        return data as Mold[]
+        return data
     },
 
-    // Obtener catálogo de nombres de moldes existentes
-    async getMoldsCatalog() {
-        const supabase = createClient()
-        const { data, error } = await supabase
-            .from('moldes')
-            .select('nombre_articulo')
-            .order('nombre_articulo', { ascending: true })
-
-        if (error) return []
-
-        const unique = Array.from(new Set((data as any[] || []).map(m => m.nombre_articulo))).filter(Boolean)
-        return unique
-    },
-
-    // Obtener catálogo de defectos
+    // Get defects from 'Defectos_moldes' with tiempo info
     async getDefectsCatalog() {
         const supabase = createClient()
-        // 1. Intentamos obtener del catálogo oficial
-        const { data: catData, error: catError } = await supabase
-            .from('Defectos moldes')
-            .select('Título,Tiempo')
-            .order('Título', { ascending: true })
+        // We use select('*') and map manually to handle the exact casing from the DB (Título, Tiempo)
+        const { data, error } = await supabase
+            .from('Defectos_moldes')
+            .select('*')
 
-        if (!catError && catData && catData.length > 0) {
-            return catData
+        if (error) {
+            console.warn('Error fetching Defectos_moldes:', error.message)
+            return []
+        }
+        
+        if (!data || data.length === 0) {
+            console.warn('Defectos_moldes returned 0 records. Check RLS policies.')
+            return []
         }
 
-        // 2. Si el catálogo está vacío, extraemos valores únicos de la tabla de registros
-        console.warn('Defectos moldes table is empty, extracting from registros_moldes...')
-        const { data: regData } = await supabase
-            .from('registros_moldes')
-            .select('"DEFECTOS A REPARAR"')
-            .not('"DEFECTOS A REPARAR"', 'is', null)
-            .limit(500)
-
-        if (regData) {
-            const allDefects = new Set<string>()
-            regData.forEach(r => {
-                const val = r['DEFECTOS A REPARAR']
-                if (val) {
-                    // Divide por comas si hay múltiples y limpia
-                    val.split(',').forEach((d: string) => {
-                        const clean = d.trim()
-                        if (clean && clean !== 'NULL') allDefects.add(clean)
-                    })
-                }
-            })
-            return Array.from(allDefects).sort().map(d => ({ Título: d }))
-        }
-
-        return []
+        return data.map((d: any) => ({
+            id: d.id,
+            titulo: d.Título || d.titulo || d.Nombre || 'Sin Título',
+            tiempo: parseFloat(d.Tiempo || d.tiempo || 0)
+        })).sort((a, b) => a.titulo.localeCompare(b.titulo))
     },
 
-    // Obtener catálogo de personal (operarios)
+    // Get personnel
     async getPersonnel() {
         const supabase = createClient()
         const { data, error } = await supabase
@@ -124,157 +106,163 @@ export const moldsService = {
             .select('Nombre, Cedula')
             .order('Nombre', { ascending: true })
 
-        if (error) {
-            console.error('Error fetching personnel:', error)
-            return []
-        }
-        // Map to a consistent format
+        if (error) return []
         return data.map((p: any) => ({
             NombreCompleto: p.Nombre,
             Cedula: p.Cedula
         }))
     },
 
-    // Conteo por referencia en reparación
-    async getCountByReference(nombreReferencia: string) {
-        const supabase = createClient()
-        const { count, error } = await supabase
-            .from('moldes')
-            .select('*', { count: 'exact', head: true })
-            .eq('nombre_articulo', nombreReferencia)
-            .ilike('estado', '%reparacion%')
-
-        if (error) return 0
-        return count || 0
-    },
-
-    // Guardar o Actualizar
-    async saveMold(moldData: Mold) {
-        const supabase = createClient()
-
-        if (moldData.id) {
-            const { error: updateError } = await supabase
-                .from('moldes')
-                .update({
-                    ...moldData,
-                    modified_at: new Date().toISOString(),
-                    modificado_por: moldData.modificado_por || moldData.Responsable
-                })
-                .eq('id', moldData.id)
-            if (updateError) throw updateError
-        } else {
-            const { error: insertError } = await supabase
-                .from('moldes')
-                .insert([{
-                    ...moldData,
-                    created_at: new Date().toISOString()
-                }])
-            if (insertError) throw insertError
-        }
-    },
-
-    // Obtener historial completo de un molde
-    async getHistoryForMold(codigoMolde: string) {
-        const supabase = createClient()
-        const { data, error } = await supabase
-            .from('moldes')
-            .select('*')
-            .eq('serial', codigoMolde)
-            .order('created_at', { ascending: false })
-
-        if (error) {
-            console.error('Error fetching history:', error)
-            return []
-        }
-        return data as MoldActive[]
-    },
-
-    // Actualizar estado
-    async updateStatus(mold: Mold, newStatus: string, user: string) {
-        const supabase = createClient()
-        const { error } = await supabase
-            .from('moldes')
-            .update({ 
-                estado: newStatus,
-                modified_at: new Date().toISOString(),
-                modificado_por: user
-            })
-            .eq('serial', mold.serial)
-            
-        if (error) throw error
-    },
-
-    // Obtener todos los registros unificados (base_datos_moldes + migracion_moldes + BD Moldes.csv)
-    async getAllRegistros(limit = 20, offset = 0, search = '', filters?: { defecto?: string, responsable?: string, fecha_desde?: string, fecha_hasta?: string }) {
+    // Module: HISTÓRICO MOLDES (public."base_datos_historico_moldes")
+    async getHistoricoMoldes(limit = 100, offset = 0, search = '', filters?: any) {
         const supabase = createClient()
         let query = supabase
-            .from('registros_moldes')
+            .from('base_datos_historico_moldes')
             .select('*')
-            // Order by FECHA ENTRADA descending (most recent first)
-            .order('FECHA ENTRADA', { ascending: false, nullsFirst: false })
+            .order('fecha_entrada', { ascending: false })
 
         if (search.trim()) {
             const term = `%${search.trim()}%`
-            // Construct OR filter for multiple columns
-            query = query.or(`"CODIGO MOLDE".ilike.${term},Nombre.ilike.${term},"DEFECTOS A REPARAR".ilike.${term},OBSERVACIONES.ilike.${term},Usuario.ilike.${term}`)
+            query = query.or(`codigo_molde.ilike.${term},titulo.ilike.${term},defectos_a_reparar.ilike.${term},estado.ilike.${term}`)
         }
 
-        // Apply filters
-        if (filters) {
-            if (filters.defecto) {
-                // Since defects might be comma separated in the data, we use ilike with wildcards
-                query = query.ilike('DEFECTOS A REPARAR', `%${filters.defecto}%`)
-            }
-            if (filters.responsable) {
-                query = query.eq('Responsable', filters.responsable)
-            }
-            if (filters.fecha_desde) {
-                query = query.gte('FECHA ENTRADA', filters.fecha_desde)
-            }
-            if (filters.fecha_hasta) {
-                query = query.lte('FECHA ENTRADA', filters.fecha_hasta)
+        const { data, error } = await query.range(offset, offset + limit - 1)
+        if (error) {
+            console.error('Error fetching base_datos_historico_moldes:', error)
+            return []
+        }
+        return data || []
+    },
+
+    // Module: REGISTRO MOLDES (public."BD_moldes")
+    async getRegistroMoldes(limit = 50, offset = 0, search = '', filters?: any) {
+        const supabase = createClient()
+        // New exact column names: "FECHA ENTRADA", "Título", "CODIGO MOLDE", "DEFECTOS A REPARAR", "ESTADO"
+        let query = supabase
+            .from('BD_moldes')
+            .select('*')
+            .order('"FECHA ENTRADA"', { ascending: false, nullsFirst: false })
+
+        if (search.trim()) {
+            const term = `%${search.trim()}%`
+            query = query.or(`"CODIGO MOLDE".ilike.${term},"Título".ilike.${term},"DEFECTOS A REPARAR".ilike.${term},"ESTADO".ilike.${term}`)
+        }
+
+        if (filters?.repair_type && filters.repair_type !== 'Todos') {
+            if (filters.repair_type === 'Reparaciones') {
+                // General repairs view
+                query = query.or(`"ESTADO".ilike.%reparacion%,"Tipo de reparacion".ilike.%reparacion%,"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%especial%`)
+            } else if (filters.repair_type.toLowerCase().includes('rapida')) {
+                // Specific: Rapida
+                query = query.ilike('"Tipo de reparacion"', '%rapida%')
+            } else if (filters.repair_type.toLowerCase().includes('especial')) {
+                // Specific: Especial
+                query = query.ilike('"Tipo de reparacion"', '%especial%')
+            } else {
+                // Other exact matches
+                query = query.eq('"Tipo de reparacion"', filters.repair_type)
             }
         }
 
         const { data, error } = await query.range(offset, offset + limit - 1)
-
         if (error) {
-            console.error('Error fetching registros:', error)
+            console.error('Error fetching BD_moldes:', error)
             return []
         }
-        return data
-    },
-
-    // Actualizar registro histórico de molde
-    async updateRegistroMolde(id: string | number, payload: any) {
-        const supabase = createClient()
-        const { error } = await supabase
-            .from('registros_moldes')
-            .update(payload)
-            .eq('ID', id)
-
-        if (error) {
-            console.error('Error updating registro molde:', error)
-            throw error
-        }
-    },
-    
-    // Crear nuevo registro histórico
-    async createRegistroMolde(payload: any) {
-        const supabase = createClient()
-        const { data, error } = await supabase
-            .from('registros_moldes')
-            .insert([payload])
-            .select()
         
-        if (error) {
-            console.error('Error creating registro molde:', error)
-            throw error
-        }
-        return data?.[0]
+        // Return mapped records for UI consistency
+        return (data || []).map((m: any) => ({
+            ...m,
+            titulo: m["Título"],
+            codigo_molde: m["CODIGO MOLDE"],
+            defectos_a_reparar: m["DEFECTOS A REPARAR"],
+            fecha_entrada: m["FECHA ENTRADA"],
+            fecha_esperada: m["FECHA ESPERADA"],
+            fecha_entrega: m["FECHA ENTREGA"],
+            estado: m["ESTADO"],
+            observaciones: m["OBSERVACIONES"],
+            usuario: m["Usuario"],
+            responsable: m["Responsable"],
+            tipo_de_reparacion: m["Tipo de reparacion"],
+            tipo: m["Tipo"]
+        }))
     },
 
-    // Obtener supervisores, jefes y lideres (tabla empleados)
+    // Alias for compatibility if needed
+    async getAllRegistros(limit = 20, offset = 0, search = '', filters?: any) {
+        return this.getRegistroMoldes(limit, offset, search, filters)
+    },
+
+    async getHistoryFromHistoricoTable(limit = 50, offset = 0, search = '', filters?: any) {
+        return this.getHistoricoMoldes(limit, offset, search, filters)
+    },
+
+    // Save to BOTH 'BD_moldes' and 'moldes' (Sync remains as described in previous turn)
+    async saveRegistro(record: any, isNew: boolean) {
+        const supabase = createClient()
+        let saved;
+        
+        // Map internal names back to strange DB names for BD_moldes
+        const dbRecord = {
+            "Título": record.titulo,
+            "CODIGO MOLDE": record.codigo_molde,
+            "DEFECTOS A REPARAR": record.defectos_a_reparar,
+            "FECHA ENTRADA": record.fecha_entrada,
+            "FECHA ESPERADA": record.fecha_esperada,
+            "FECHA ENTREGA": record.fecha_entrega,
+            "ESTADO": record.estado,
+            "OBSERVACIONES": record.observaciones,
+            "Usuario": record.usuario,
+            "Responsable": record.responsable,
+            "Tipo de reparacion": record.tipo_de_reparacion,
+            "Tipo": record.tipo,
+            "Modified": new Date().toISOString(),
+            "Modified By": record.usuario || record.modified_by
+        }
+
+        if (isNew) {
+            // Include IDs for new records if provided/managed
+            (dbRecord as any).id = record.id;
+            (dbRecord as any)["Created"] = new Date().toISOString();
+            (dbRecord as any)["Created By"] = record.usuario;
+
+            const { data, error } = await supabase
+                .from('BD_moldes')
+                .insert([dbRecord])
+                .select()
+            if (error) throw error
+            saved = data?.[0]
+        } else {
+            const { data, error } = await supabase
+                .from('BD_moldes')
+                .update(dbRecord)
+                .eq('id', record.id)
+                .select()
+            if (error) throw error
+            saved = data?.[0]
+        }
+
+        // 2. Synchronize with MASTER 'moldes' table
+        const masterUpdate = {
+            estado: record.estado,
+            Responsable: record.responsable,
+            Tipo_de_reparacion: record.tipo_de_reparacion,
+            Fecha_de_ingreso: record.fecha_entrada,
+            Fecha_esperada: record.fecha_esperada,
+            Fecha_de_entrega: record.fecha_entrega,
+            observaciones: record.observaciones,
+            modified_at: new Date().toISOString(),
+            modificado_por: record.usuario
+        }
+
+        await supabase
+            .from('moldes')
+            .update(masterUpdate)
+            .eq('serial', record.codigo_molde)
+
+        return saved
+    },
+
     async getSupervisorsAndLeaders() {
         const supabaseTH = createClientTH()
         const { data, error } = await supabaseTH
@@ -282,11 +270,48 @@ export const moldsService = {
             .select('id, nombreCompleto, cargo')
             .or('cargo.ilike.supervisor,cargo.ilike.jefe,cargo.ilike.lider')
             .order('nombreCompleto', { ascending: true })
-
-        if (error) {
-            console.error('Error fetching supervisors/leaders:', error)
-            return []
-        }
+        if (error) return []
         return data || []
+    },
+
+    // Raw Materials Methods
+    async getRawMaterials() {
+        const supabase = createClient()
+        // Source table for query: public."Materia_prima_moldes"
+        const { data, error } = await supabase
+            .from('Materia_prima_moldes')
+            .select('*')
+            
+        if (error) {
+            console.error('Error fetching Materia_prima_moldes:', error.message)
+            throw error
+        }
+        
+        // Return records mapping to instruction-specified fields (Título, CODIGO MP, UNDS, etc.)
+        return (data || []).map((m: any) => ({
+            id: m.id,
+            titulo: m.Título || m['Materia Prima'] || 'Sin Título',
+            codigo_mp: m['CODIGO MP'] || m['Número de artículo SAP'] || 'S/C',
+            unds: m.UNDS || m['Unidad de medida de compras'] || 'UN',
+            mp_molde: m['MP MOLDE'] || '--',
+            mp_molde_codigo: m['MP MOLDE CODIGO'] || '--',
+            // Keep actual row for autocompletion
+            raw: m
+        })).sort((a, b) => a.titulo.localeCompare(b.titulo))
+    },
+
+    async saveRawMaterialMovement(movement: any) {
+        const supabase = createClient()
+        // Target table for save: public."Entradas_salidas_MP"
+        const { data, error } = await supabase
+            .from('Entradas_salidas_MP')
+            .insert([movement])
+            .select()
+            
+        if (error) {
+            console.error('Error saving to Entradas_salidas_MP:', error.message)
+            throw error
+        }
+        return data?.[0]
     }
 }

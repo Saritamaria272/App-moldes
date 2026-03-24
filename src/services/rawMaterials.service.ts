@@ -9,12 +9,13 @@ export interface RawMaterial {
 
 export interface ConsumptionRecord {
     id?: string
-    materia_prima_id: string // SAP number or internal ID
     materia_prima_nombre: string
     materia_prima_codigo: string
+    materia_prima_id?: string
     unidad: string
-    tipo: 'Entradas' | 'Salidas' | 'Pendiente' | 'Solicitud de traslado'
-    concepto: 'Ajuste de inventario' | 'Abastecimiento' | 'Molde nuevo' | 'Reparación'
+    unidades: number
+    tipo: string
+    concepto: string
     molde_asociado_id?: string | number | null
     observaciones?: string
     created_at?: string

@@ -1,119 +1,150 @@
+
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-import { rawMaterialsService, RawMaterial, ConsumptionRecord } from '@/services/rawMaterials.service'
-import { Package, Search, Loader2, Save, AlertCircle, CheckCircle2, Factory } from 'lucide-react'
+import { moldsService } from '@/services/molds.service'
+import { 
+    Package, 
+    Search, 
+    Loader2, 
+    Save, 
+    AlertCircle, 
+    CheckCircle2, 
+    Factory, 
+    Hash, 
+    Ruler, 
+    Calculator, 
+    ArrowLeftRight, 
+    FileText, 
+    MessageSquare,
+    ChevronDown,
+    Calendar,
+    User
+} from 'lucide-react'
 
 export default function RawMaterialConsumption() {
-    const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
-    // Selection results for Molds
-    const [moldSearchQuery, setMoldSearchQuery] = useState('')
-    const [moldResults, setMoldResults] = useState<any[]>([])
-    const [searchingMolds, setSearchingMolds] = useState(false)
+    // Catalogs
+    const [rawMaterials, setRawMaterials] = useState<any[]>([])
+    const [user, setUser] = useState<any>(null)
 
-    // Form state
+    // Form state matching instructions EXACTLY
     const [formData, setFormData] = useState({
-        sapNumber: '',
-        materiaPrima: '',
-        unidad: '',
+        id: '', // internal selector id
+        titulo: '',
+        codigo_mp: '',
+        cantidad: '',
+        unds: '',
         tipo: '',
+        mp_molde: '--',
+        mp_molde_codigo: '--',
         concepto: '',
-        moldeId: null as string | number | null,
-        moldeNombre: '',
-        observaciones: ''
+        observaciones: '',
+        sap: false
     })
 
-    const supabase = createClient()
-
     useEffect(() => {
-        loadRawMaterials()
+        const storedUser = localStorage.getItem('moldapp_user')
+        if (storedUser) setUser(JSON.parse(storedUser))
+
+        const loadData = async () => {
+            try {
+                const materials = await moldsService.getRawMaterials()
+                setRawMaterials(materials || [])
+            } catch (error) {
+                console.error('Error loading materials:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+        loadData()
     }, [])
 
-    const loadRawMaterials = async () => {
-        setLoading(true)
-        const data = await rawMaterialsService.getRawMaterials()
-        setRawMaterials(data)
-        setLoading(false)
-    }
-
-    // Handle Materia Prima Selection
-    const handleMateriaPrimaChange = (materiaName: string) => {
-        const material = rawMaterials.find(m => m["Materia Prima"] === materiaName)
-        if (material) {
-            setFormData({
-                ...formData,
-                materiaPrima: materiaName,
-                sapNumber: material["Número de artículo SAP"],
-                unidad: material["Unidad de medida de compras"]
-            })
-        } else {
-            setFormData({ ...formData, materiaPrima: '', sapNumber: '', unidad: '' })
+    const handleMaterialChange = (id: string) => {
+        const mat = rawMaterials.find(m => String(m.id) === String(id))
+        if (mat) {
+            // Autocomplete based on instructores (Título, CODIGO MP, UNDS, etc)
+            // m.raw contains the original Supabase record
+            const r = mat.raw;
+            setFormData(prev => ({
+                ...prev,
+                id: mat.id,
+                titulo: r.Título || r['Materia Prima'] || 'Sin Título',
+                codigo_mp: r['CODIGO MP'] || r['Número de artículo SAP'] || 'S/C',
+                unds: r.UNDS || r['Unidad de medida de compras'] || 'UN',
+                mp_molde: r['MP MOLDE'] || '--',
+                mp_molde_codigo: r['MP MOLDE CODIGO'] || '--'
+            }))
         }
     }
-
-    // Search Molds for Molde Asociado
-    useEffect(() => {
-        const searchMolds = async () => {
-            if (moldSearchQuery.length < 2) {
-                setMoldResults([])
-                return
-            }
-            setSearchingMolds(true)
-            const { data } = await supabase
-                .from('moldes')
-                .select('id, nombre_articulo, serial')
-                .or(`nombre_articulo.ilike.%${moldSearchQuery}%, serial.ilike.%${moldSearchQuery}%`)
-                .limit(5)
-            setMoldResults(data || [])
-            setSearchingMolds(false)
-        }
-        const timer = setTimeout(searchMolds, 300)
-        return () => clearTimeout(timer)
-    }, [moldSearchQuery])
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault()
+        
+        // Final Validations
+        if (!formData.id) {
+            setMessage({ type: 'error', text: 'Debe seleccionar un material.' });
+            return;
+        }
+        if (!formData.cantidad || parseFloat(formData.cantidad) === 0) {
+            setMessage({ type: 'error', text: 'La cantidad debe ser válida y positiva.' });
+            return;
+        }
+        if (!formData.tipo) {
+            setMessage({ type: 'error', text: 'Debe seleccionar un tipo de movimiento.' });
+            return;
+        }
+
         setSaving(true)
         setMessage(null)
 
         try {
-            const storedUser = localStorage.getItem('moldapp_user')
-            const user = storedUser ? JSON.parse(storedUser) : null
+            const now = new Date().toISOString()
+            const usuarioStr = user?.Nombre || user?.NombreCompleto || 'Desconocido'
 
-            const record: ConsumptionRecord = {
-                materia_prima_id: formData.sapNumber,
-                materia_prima_nombre: formData.materiaPrima,
-                materia_prima_codigo: formData.sapNumber,
-                unidad: formData.unidad,
-                tipo: formData.tipo as any,
-                concepto: formData.concepto as any,
-                molde_asociado_id: (formData.concepto === 'Molde nuevo' || formData.concepto === 'Reparación') ? formData.moldeId : null,
-                observaciones: formData.observaciones,
-                created_by: user?.Nombre || 'Usuario'
+            // Prepare record for public."Entradas_salidas_MP"
+            const finalRecord = {
+                'id': undefined, // id is SERIAL PK, always create new
+                'Título': formData.titulo,
+                'CODIGO MP': formData.codigo_mp,
+                'CANTIDAD': formData.cantidad,
+                'UNDS': formData.unds,
+                'TIPO': formData.tipo,
+                'MP MOLDE': formData.mp_molde,
+                'MP MOLDE CODIGO': formData.mp_molde_codigo,
+                'CONCEPTO': formData.concepto,
+                'OBSERVACIONES': formData.observaciones,
+                'Created': now,
+                'Usuario': usuarioStr,
+                'SAP': formData.sap,
+                'Modified': now,
+                'Modified By': usuarioStr
             }
 
-            await rawMaterialsService.saveConsumption(record)
+            await moldsService.saveRawMaterialMovement(finalRecord)
 
-            setMessage({ type: 'success', text: 'Registro guardado exitosamente.' })
+            setMessage({ type: 'success', text: 'Movimiento registrado correctamente en Entradas_salidas_MP.' })
+            
+            // Clear form
             setFormData({
-                sapNumber: '',
-                materiaPrima: '',
-                unidad: '',
+                id: '',
+                titulo: '',
+                codigo_mp: '',
+                cantidad: '',
+                unds: '',
                 tipo: '',
+                mp_molde: '--',
+                mp_molde_codigo: '--',
                 concepto: '',
-                moldeId: null,
-                moldeNombre: '',
-                observaciones: ''
+                observaciones: '',
+                sap: false
             })
-            setMoldSearchQuery('')
         } catch (error: any) {
             console.error(error)
-            setMessage({ type: 'error', text: 'Error al guardar: ' + (error.message || 'Error desconocido') })
+            setMessage({ type: 'error', text: 'Fallo técnica: ' + (error.message || 'Error desconocido') })
         } finally {
             setSaving(false)
         }
@@ -121,179 +152,219 @@ export default function RawMaterialConsumption() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-                <p className="text-gray-500 animate-pulse text-sm">Cargando inventario...</p>
+            <div className="flex flex-col items-center justify-center py-40 gap-6">
+                <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
+                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-400">Consultando Materia_prima_moldes...</p>
             </div>
         )
     }
 
-    const showMoldField = formData.concepto === 'Molde nuevo' || formData.concepto === 'Reparación'
-
     return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-700">
-            <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center border border-green-500/20">
-                    <Factory className="w-6 h-6 text-green-400" />
+        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700 py-6">
+            {/* Module Title */}
+            <div className="flex flex-col md:flex-row items-center gap-8 mb-4">
+                <div className="w-24 h-24 bg-emerald-500/10 rounded-[2.8rem] flex items-center justify-center border-2 border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
+                    <Factory className="w-12 h-12 text-emerald-500" />
                 </div>
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-1">
-                        Consumo de <span className="text-green-500">Materia Prima</span>
+                <div className="text-center md:text-left">
+                    <h1 className="text-5xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none mb-3">
+                        Materia <span className="text-emerald-500">Prima</span>
                     </h1>
-                    <p className="text-gray-500 text-sm italic">Registro de movimientos y salidas de almacén.</p>
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">
+                        <span className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full"><Search className="w-3 h-3"/> Origen: Materia_prima_moldes</span>
+                        <span className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full"><Loader2 className="w-3 h-3"/> Destino: Entradas_salidas_MP</span>
+                    </div>
                 </div>
             </div>
 
-            <form onSubmit={handleSave} className="p-8 glass-card rounded-[2.5rem] border border-black/5 dark:border-white/5 space-y-8">
-                {/* FILA 1: Materia Prima | Código | Unidades */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Materia Prima</label>
-                        <select
-                            className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
-                            value={formData.materiaPrima}
-                            onChange={(e) => handleMateriaPrimaChange(e.target.value)}
-                            required
-                        >
-                            <option value="">Selecciona materia prima...</option>
-                            {rawMaterials.map((mat, i) => (
-                                <option key={i} value={mat["Materia Prima"]}>{mat["Materia Prima"]}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Código SAP</label>
-                        <div className="w-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-xl py-3 px-4 text-slate-500 dark:text-gray-400 font-mono text-sm min-h-[50px] flex items-center">
-                            {formData.sapNumber || 'Automático'}
+            <form onSubmit={handleSave} className="bg-white dark:bg-slate-901 rounded-[4rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden backdrop-blur-3xl relative">
+                <div className="p-12 lg:p-20 space-y-16">
+                    
+                    {/* SECTION 1: Material Selection */}
+                    <div className="space-y-10">
+                        <div className="flex items-center gap-4">
+                            <div className="h-0.5 w-12 bg-emerald-500 rounded-full"></div>
+                            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Selección de Insumo</h2>
                         </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Unidades</label>
-                        <div className="w-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 rounded-xl py-3 px-4 text-slate-500 dark:text-gray-400 text-sm min-h-[50px] flex items-center">
-                            {formData.unidad || 'Unidad de medida'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* FILA 2: Tipo */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Tipo de Movimiento</label>
-                        <select
-                            className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
-                            value={formData.tipo}
-                            onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-                            required
-                        >
-                            <option value="">Selecciona tipo...</option>
-                            <option value="Entradas">Entradas</option>
-                            <option value="Salidas">Salidas</option>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="Solicitud de traslado">Solicitud de traslado</option>
-                        </select>
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Concepto</label>
-                        <select
-                            className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all appearance-none"
-                            value={formData.concepto}
-                            onChange={(e) => {
-                                const newConcept = e.target.value
-                                setFormData({
-                                    ...formData,
-                                    concepto: newConcept,
-                                    moldeId: (newConcept === 'Molde nuevo' || newConcept === 'Reparación') ? formData.moldeId : null
-                                })
-                            }}
-                            required
-                        >
-                            <option value="">Selecciona concepto...</option>
-                            <option value="Ajuste de inventario">Ajuste de inventario</option>
-                            <option value="Abastecimiento">Abastecimiento</option>
-                            <option value="Molde nuevo">Molde nuevo</option>
-                            <option value="Reparación">Reparación</option>
-                        </select>
-                    </div>
-                </div>
-
-                {/* FILA 3: Molde Asociado (Conditional) */}
-                {showMoldField && (
-                    <div className="space-y-2 relative animate-in slide-in-from-top-2 duration-300">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1 flex items-center gap-2">
-                            <Package className="w-4 h-4 text-blue-400" />
-                            Molde Asociado
-                        </label>
-                        <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Escribe nombre o código del molde..."
-                                className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all"
-                                value={formData.moldeNombre || moldSearchQuery}
-                                onChange={(e) => {
-                                    setMoldSearchQuery(e.target.value)
-                                    setFormData({ ...formData, moldeId: null, moldeNombre: '' })
-                                }}
-                                required={showMoldField}
-                            />
-                            {searchingMolds && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 animate-spin" />}
-                        </div>
-                        {moldResults.length > 0 && (
-                            <div className="absolute z-50 w-full mt-2 bg-white dark:bg-[#1a1a1a] border border-black/10 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden">
-                                {moldResults.map((m, i) => (
-                                    <div
-                                        key={i}
-                                        onClick={() => {
-                                            setFormData({ ...formData, moldeId: m.id, moldeNombre: `${m.nombre_articulo} [${m.serial}]` })
-                                            setMoldResults([])
-                                            setMoldSearchQuery('')
-                                        }}
-                                        className="p-4 hover:bg-black/5 dark:hover:bg-blue-600/20 cursor-pointer border-b border-black/5 dark:border-white/5 last:border-0"
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
+                                    <Package className="w-4 h-4 text-emerald-500" /> Material Base
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        required
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 appearance-none transition-all cursor-pointer uppercase"
+                                        value={formData.id}
+                                        onChange={(e) => handleMaterialChange(e.target.value)}
                                     >
-                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{m.nombre_articulo}</p>
-                                        <p className="text-xs text-slate-500 dark:text-gray-500">{m.serial}</p>
-                                    </div>
-                                ))}
+                                        <option value="" disabled hidden>BUSCAR EN MATERIA_PRIMA_MOLDES...</option>
+                                        {rawMaterials.map(m => (
+                                            <option key={m.id} value={m.id}>{m.titulo}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 pointer-events-none" />
+                                </div>
                             </div>
-                        )}
-                        {formData.moldeId && (
-                            <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-lg w-fit">
-                                <CheckCircle2 className="w-3 h-3 text-blue-400" />
-                                <span className="text-[10px] text-blue-300 font-bold uppercase tracking-tight">Vinculado: {formData.moldeNombre}</span>
-                            </div>
-                        )}
-                    </div>
-                )}
 
-                {/* Observaciones */}
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest ml-1">Observaciones</label>
-                    <textarea
-                        className="w-full bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-2xl py-4 px-4 text-slate-900 dark:text-white focus:ring-2 focus:ring-green-500/50 outline-none transition-all min-h-[120px] resize-none"
-                        placeholder="Detalles adicionales del movimiento..."
-                        value={formData.observaciones}
-                        onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                    />
+                            <div className="space-y-4 opacity-70">
+                                <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
+                                    <Hash className="w-4 h-4 text-emerald-500" /> Código MP
+                                </label>
+                                <input
+                                    readOnly
+                                    type="text"
+                                    className="w-full bg-slate-100 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-mono text-xs font-black text-slate-500 dark:text-slate-400 outline-none"
+                                    value={formData.codigo_mp}
+                                    placeholder="Auto-completado..."
+                                />
+                            </div>
+                        </div>
+
+                        {/* AUTO-FILLED TECH DATA */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 p-10 bg-slate-50/50 dark:bg-slate-950/40 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-800">
+                           <div className="space-y-2">
+                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Unidad Origen (UNDS)</p>
+                               <div className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase">{formData.unds || '---'}</div>
+                           </div>
+                           <div className="space-y-2">
+                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">MP Molde Relacionado</p>
+                               <div className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase truncate">{formData.mp_molde || '---'}</div>
+                           </div>
+                           <div className="space-y-2">
+                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Código Molde SAP</p>
+                               <div className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase font-mono">{formData.mp_molde_codigo || '---'}</div>
+                           </div>
+                        </div>
+                    </div>
+
+                    {/* SECTION 2: Movement Details */}
+                    <div className="space-y-10">
+                        <div className="flex items-center gap-4">
+                            <div className="h-0.5 w-12 bg-emerald-500 rounded-full"></div>
+                            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Cuantificación & Registro</h2>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
+                                    <Calculator className="w-4 h-4 text-emerald-500" /> Cantidad <span className="text-red-500 text-lg">*</span>
+                                </label>
+                                <input
+                                    required
+                                    type="number"
+                                    step="any"
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                                    placeholder="0.00"
+                                    value={formData.cantidad}
+                                    onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
+                                    <ArrowLeftRight className="w-4 h-4 text-emerald-500" /> Tipo Movimiento
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        required
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 appearance-none transition-all cursor-pointer"
+                                        value={formData.tipo}
+                                        onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                                    >
+                                        <option value="" disabled hidden>SELECCIONAR TIPO...</option>
+                                        <option value="Entrada">Entrada</option>
+                                        <option value="Salida">Salida</option>
+                                        <option value="Ajuste">Ajuste de Saldo</option>
+                                        <option value="Transferencia">Transferencia</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 pointer-events-none" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
+                                    <FileText className="w-4 h-4 text-emerald-500" /> Concepto
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        required
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 appearance-none transition-all cursor-pointer"
+                                        value={formData.concepto}
+                                        onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
+                                    >
+                                        <option value="" disabled hidden>SELECCIONAR CONCEPTO...</option>
+                                        <option value="Consumo de Producción">Consumo de Producción</option>
+                                        <option value="Abastecimiento SAP">Abastecimiento SAP</option>
+                                        <option value="Devolución">Devolución</option>
+                                        <option value="Baja de Inventario">Baja de Inventario</option>
+                                        <option value="Reparación Especial">Reparación Especial</option>
+                                        <option value="Fabricación Molde">Fabricación Molde</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 pointer-events-none" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
+                                <MessageSquare className="w-4 h-4 text-emerald-500" /> Observaciones Técnicas
+                            </label>
+                            <textarea
+                                className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-[3rem] py-10 px-12 font-bold text-sm text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 resize-none h-56 transition-all"
+                                placeholder="..."
+                                value={formData.observaciones}
+                                onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-4 ml-6">
+                            <input
+                                id="sap-check"
+                                type="checkbox"
+                                className="w-6 h-6 rounded-lg border-2 border-slate-300 accent-emerald-500 cursor-pointer"
+                                checked={formData.sap}
+                                onChange={(e) => setFormData({ ...formData, sap: e.target.checked })}
+                            />
+                            <label htmlFor="sap-check" className="text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer select-none">
+                                ¿Sincronizar con SAP?
+                            </label>
+                        </div>
+                    </div>
+
                 </div>
 
-                {message && (
-                    <div className={`p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'
-                        }`}>
-                        {message.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                        <span className="text-sm font-medium">{message.text}</span>
-                    </div>
-                )}
+                {/* Footer Actions */}
+                <div className="p-12 lg:p-20 bg-slate-50 dark:bg-slate-950/20 border-t-2 border-slate-200 dark:border-slate-800 flex flex-col items-center">
+                    {message && (
+                        <div className={`w-full max-w-2xl mb-12 p-8 rounded-[2.5rem] flex items-center justify-center gap-6 animate-in fade-in slide-in-from-bottom-4 border-2 ${message.type === 'success' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-red-500/10 text-red-600 border-red-500/20'}`}>
+                            {message.type === 'success' ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+                            <span className="font-black uppercase tracking-[0.2em] text-xs">{message.text}</span>
+                        </div>
+                    )}
 
-                <button
-                    type="submit"
-                    disabled={saving}
-                    className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-green-500/20 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
-                >
-                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar Registro</>}
-                </button>
+                    <div className="flex flex-col md:flex-row items-center gap-8 w-full max-w-4xl">
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-black py-8 rounded-[2.8rem] transition-all shadow-2xl shadow-emerald-500/30 flex items-center justify-center gap-6 uppercase tracking-[0.3em] text-[11px] active:scale-[0.98]"
+                        >
+                            {saving ? <Loader2 className="w-8 h-8 animate-spin" /> : <><Save className="w-8 h-8" /> Confirmar & Registrar Movimiento</>}
+                        </button>
+                    </div>
+                    
+                    <div className="mt-12 flex flex-col md:flex-row items-center gap-10 text-slate-400">
+                        <div className="flex items-center gap-3">
+                            <User className="w-4 h-4 text-emerald-500/50" />
+                            <span className="text-[9px] font-black uppercase tracking-widest">{user?.Nombre || 'Sessión Activa'}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Calendar className="w-4 h-4 text-emerald-500/50" />
+                            <span className="text-[9px] font-black uppercase tracking-widest">{new Date().toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                </div>
             </form>
         </div>
     )
