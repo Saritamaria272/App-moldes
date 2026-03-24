@@ -33,6 +33,12 @@ export default function RegistroMoldesPage() {
     const [editForm, setEditForm] = useState<any>({})
     const [isSaving, setIsSaving] = useState(false)
     const [isCreateMode, setIsCreateMode] = useState(false)
+
+    // Mold Search State
+    const [moldSearchQuery, setMoldSearchQuery] = useState('')
+    const [moldSearchResults, setMoldSearchResults] = useState<any[]>([])
+    const [isSearchingMolds, setIsSearchingMolds] = useState(false)
+    const [showMoldResults, setShowMoldResults] = useState(false)
     
     // Autocomplete for Master Molds
     const [masterMolds, setMasterMolds] = useState<any[]>([])
@@ -247,6 +253,36 @@ export default function RegistroMoldesPage() {
         } finally {
             setIsSaving(false)
         }
+    }
+
+    const handleMoldSearch = async (query: string) => {
+        setEditForm((prev: any) => ({ ...prev, "CODIGO MOLDE": query.toUpperCase() }))
+        
+        if (query.trim().length < 2) {
+            setMoldSearchResults([])
+            setShowMoldResults(false)
+            return
+        }
+
+        setIsSearchingMolds(true)
+        setShowMoldResults(true)
+        try {
+            const results = await moldsService.searchMolds(query)
+            setMoldSearchResults(results || [])
+        } catch (error) {
+            console.error('Error searching molds:', error)
+        } finally {
+            setIsSearchingMolds(false)
+        }
+    }
+
+    const handleSelectMold = (mold: any) => {
+        setEditForm((prev: any) => ({
+            ...prev,
+            "CODIGO MOLDE": mold.serial,
+            "Nombre": mold.nombre_articulo
+        }))
+        setShowMoldResults(false)
     }
 
     return (
