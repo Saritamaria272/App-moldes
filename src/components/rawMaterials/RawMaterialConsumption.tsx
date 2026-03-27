@@ -43,8 +43,13 @@ export default function RawMaterialConsumption() {
         mp_molde_codigo: '--',
         concepto: '',
         observaciones: '',
-        sap: false
+        relacion_molde: '' // Added for mould relation
     })
+
+    const [moldsSearchResults, setMoldsSearchResults] = useState<any[]>([])
+    const [moldSearchTerm, setMoldSearchTerm] = useState('')
+    const [showMoldResults, setShowMoldResults] = useState(false)
+    const [isSearchingMolds, setIsSearchingMolds] = useState(false)
 
     useEffect(() => {
         const storedUser = localStorage.getItem('moldapp_user')
@@ -117,9 +122,9 @@ export default function RawMaterialConsumption() {
                 'MP MOLDE CODIGO': formData.mp_molde_codigo,
                 'CONCEPTO': formData.concepto,
                 'OBSERVACIONES': formData.observaciones,
+                'MOLDE RELACIONADO': formData.relacion_molde,
                 'Created': now,
                 'Usuario': usuarioStr,
-                'SAP': formData.sap,
                 'Modified': now,
                 'Modified By': usuarioStr
             }
@@ -140,7 +145,7 @@ export default function RawMaterialConsumption() {
                 mp_molde_codigo: '--',
                 concepto: '',
                 observaciones: '',
-                sap: false
+                relacion_molde: ''
             })
         } catch (error: any) {
             console.error(error)
@@ -148,6 +153,31 @@ export default function RawMaterialConsumption() {
         } finally {
             setSaving(false)
         }
+    }
+
+    const handleMoldSearch = async (val: string) => {
+        setMoldSearchTerm(val)
+        if (val.length < 2) {
+            setMoldsSearchResults([])
+            setShowMoldResults(false)
+            return
+        }
+        setIsSearchingMolds(true)
+        setShowMoldResults(true)
+        try {
+            const results = await moldsService.searchMoldsMaster(val)
+            setMoldsSearchResults(results || [])
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setIsSearchingMolds(false)
+        }
+    }
+
+    const selectMold = (m: any) => {
+        setFormData(prev => ({ ...prev, relacion_molde: m.serial }))
+        setMoldSearchTerm(m.serial)
+        setShowMoldResults(false)
     }
 
     if (loading) {
@@ -246,7 +276,7 @@ export default function RawMaterialConsumption() {
                             <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Cuantificación & Registro</h2>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
                             <div className="space-y-4">
                                 <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
                                     <Calculator className="w-4 h-4 text-emerald-500" /> Cantidad <span className="text-red-500 text-lg">*</span>
@@ -255,7 +285,7 @@ export default function RawMaterialConsumption() {
                                     required
                                     type="number"
                                     step="any"
-                                    className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono"
                                     placeholder="0.00"
                                     value={formData.cantidad}
                                     onChange={(e) => setFormData({ ...formData, cantidad: e.target.value })}
@@ -276,10 +306,47 @@ export default function RawMaterialConsumption() {
                                         <option value="" disabled hidden>SELECCIONAR TIPO...</option>
                                         <option value="Entrada">Entrada</option>
                                         <option value="Salida">Salida</option>
-                                        <option value="Ajuste">Ajuste de Saldo</option>
-                                        <option value="Transferencia">Transferencia</option>
                                     </select>
                                     <ChevronDown className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 pointer-events-none" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">
+                                    <Package className="w-4 h-4 text-blue-500" /> Relación con Molde
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar por código o nombre..."
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-3xl py-6 px-10 font-black text-xs text-slate-900 dark:text-white outline-none focus:ring-4 focus:ring-blue-500/10 transition-all uppercase"
+                                        value={moldSearchTerm}
+                                        onChange={(e) => handleMoldSearch(e.target.value)}
+                                        onFocus={() => { if(moldSearchTerm.length >= 2) setShowMoldResults(true) }}
+                                    />
+                                    <Search className="absolute right-10 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    
+                                    {showMoldResults && (moldsSearchResults.length > 0 || isSearchingMolds) && (
+                                        <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl z-50 p-4 max-h-60 overflow-y-auto">
+                                            {isSearchingMolds ? (
+                                                <div className="flex items-center justify-center py-4">
+                                                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                                                </div>
+                                            ) : (
+                                                moldsSearchResults.map(m => (
+                                                    <button
+                                                        key={m.id}
+                                                        type="button"
+                                                        onClick={() => selectMold(m)}
+                                                        className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl transition-all border-b border-slate-50 dark:border-slate-800 last:border-0"
+                                                    >
+                                                        <div className="text-xs font-black text-slate-900 dark:text-white uppercase">{m.serial}</div>
+                                                        <div className="text-[10px] font-bold text-slate-500 uppercase truncate">{m.nombre_articulo}</div>
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -295,12 +362,9 @@ export default function RawMaterialConsumption() {
                                         onChange={(e) => setFormData({ ...formData, concepto: e.target.value })}
                                     >
                                         <option value="" disabled hidden>SELECCIONAR CONCEPTO...</option>
-                                        <option value="Consumo de Producción">Consumo de Producción</option>
-                                        <option value="Abastecimiento SAP">Abastecimiento SAP</option>
-                                        <option value="Devolución">Devolución</option>
-                                        <option value="Baja de Inventario">Baja de Inventario</option>
-                                        <option value="Reparación Especial">Reparación Especial</option>
                                         <option value="Fabricación Molde">Fabricación Molde</option>
+                                        <option value="Reparación Especial">Reparación Especial</option>
+                                        <option value="Reparación rápida">Reparación rápida</option>
                                     </select>
                                     <ChevronDown className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 pointer-events-none" />
                                 </div>
@@ -319,18 +383,7 @@ export default function RawMaterialConsumption() {
                             />
                         </div>
 
-                        <div className="flex items-center gap-4 ml-6">
-                            <input
-                                id="sap-check"
-                                type="checkbox"
-                                className="w-6 h-6 rounded-lg border-2 border-slate-300 accent-emerald-500 cursor-pointer"
-                                checked={formData.sap}
-                                onChange={(e) => setFormData({ ...formData, sap: e.target.checked })}
-                            />
-                            <label htmlFor="sap-check" className="text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer select-none">
-                                ¿Sincronizar con SAP?
-                            </label>
-                        </div>
+
                     </div>
 
                 </div>

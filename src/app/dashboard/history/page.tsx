@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Package, ClipboardList, Activity, Search, Clock, Loader2, Filter, Calendar, User, Trash2, Edit2, X, Save, AlertTriangle } from 'lucide-react'
 import { moldsService } from '@/services/molds.service'
 import Navbar from '@/components/layout/Navbar'
+import holidaysData from '@/data/colombia_festivos_2026.json'
 
 const BATCH_SIZE = 20
 
@@ -19,7 +20,7 @@ export default function RegistroMoldesPage() {
     // Filters State
     const [searchTerm, setSearchTerm] = useState('')
     const [filterRepairType, setFilterRepairType] = useState('En Reparacion') // Default starting filter
-    const [filterView, setFilterView] = useState('Reparaciones') // 'Todos', 'Reparacion Rapida', 'Reparacion Especial'
+    const [filterView, setFilterView] = useState('Todos') // 'Todos', 'Reparacion Rapida', 'Reparacion Especial'
 
     // Catalogs State
     const [defectsCatalog, setDefectsCatalog] = useState<any[]>([])
@@ -48,6 +49,11 @@ export default function RegistroMoldesPage() {
     const [defectSearch, setDefectSearch] = useState('')
     const [showDefectDropdown, setShowDefectDropdown] = useState(false)
     const defectInputRef = useRef<HTMLInputElement>(null)
+
+    // Global Search with Autocomplete
+    const [globalMoldsResults, setGlobalMoldsResults] = useState<any[]>([])
+    const [isSearchingGlobal, setIsSearchingGlobal] = useState(false)
+    const [showGlobalResults, setShowGlobalResults] = useState(false)
 
     const searchTimeout = useRef<NodeJS.Timeout | null>(null)
     const observer = useRef<IntersectionObserver | null>(null)
@@ -96,19 +102,7 @@ export default function RegistroMoldesPage() {
                 repair_type: repairType === 'Todos' ? '' : repairType
             })
 
-            // Hard client-side filter for "Default View" if nothing is selected yet
-            let filtered = data || []
-            if (repairType === 'Reparaciones') {
-                // Return only repairs if that's the default
-                filtered = (data || []).filter((r: any) => 
-                    (r.tipo_de_reparacion || '').toLowerCase().includes('reparacion') ||
-                    (r.tipo_de_reparacion || '').toLowerCase().includes('rapida') ||
-                    (r.tipo_de_reparacion || '').toLowerCase().includes('especial') ||
-                    (r.estado || '').toLowerCase().includes('reparacion')
-                )
-            }
-
-            setRecords(filtered)
+            setRecords(data || [])
             setHasMore(data?.length === BATCH_SIZE)
         } catch (error) {
             console.error('Error fetching data:', error)
@@ -142,7 +136,7 @@ export default function RegistroMoldesPage() {
         fetchInitial(searchTerm, filterView)
     }, [searchTerm, filterView])
 
-    // Master Autocomplete Logic
+    // Modal search (within Nuevo registro): must use BD_moldes
     const handleMasterSearch = async (val: string) => {
         setMasterSearch(val)
         if (val.length < 2) {
@@ -150,33 +144,61 @@ export default function RegistroMoldesPage() {
             return
         }
         try {
-            const results = await moldsService.searchMoldsMaster(val)
+            // Requirement 2.4: Nuevo registro list must connect to BD_moldes
+            const results = await moldsService.searchRegistroMoldes(val)
             setMasterMolds(results || [])
         } catch (e) {
             console.error(e)
         }
     }
 
-    const selectMasterMold = (m: any) => {
-        setEditForm(prev => ({
+    // Global search (header): must use moldes table
+    const handleGlobalSearchChange = async (val: string) => {
+        setSearchTerm(val)
+        if (val.length < 2) {
+            setGlobalMoldsResults([])
+            setShowGlobalResults(false)
+            return
+        }
+        setIsSearchingGlobal(true)
+        setShowGlobalResults(true)
+        try {
+            // Requirement 2.2: Global search must connect to moldes table
+            const results = await moldsService.searchMoldsMaster(val)
+            setGlobalMoldsResults(results || [])
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setIsSearchingGlobal(false)
+        }
+    }
+
+    const selectGlobalMold = (m: any) => {
+        setSearchTerm(m.serial)
+        setShowGlobalResults(false)
+        // Optionally jump to it by filtering exactly
+        fetchInitial(m.serial, filterView)
+    }
+
+    const selectMasterMoldFromBD = (m: any) => {
+        setEditForm((prev: any) => ({
             ...prev,
-            codigo_molde: m.serial,
-            titulo: m.nombre_articulo,
-            responsable: m.Responsable || prev.responsable,
+            codigo_molde: m.codigo_molde,
+            titulo: m.titulo,
+            responsable: m.responsable || prev.responsable,
             estado: ['Entregado', 'En reparación', 'Destruido'].includes(m.estado) ? m.estado : 'En reparación'
         }))
         setMasterMolds([])
-        setMasterSearch(m.serial)
+        setMasterSearch(m.codigo_molde)
     }
 
-    // Logic for Fecha Esperada calculation
+    // Requirement 2.6: Calculation excluding Sat, Sun and holidays
     const calculateExpectedDate = (entryDate: string, selectedDefects: string) => {
         if (!entryDate) return ''
         const date = new Date(entryDate)
         
-        // Sum times from catalog
-        const defectArray = selectedDefects.split(',').map(d => d.trim());
         let totalDays = 0;
+        const defectArray = selectedDefects.split(',').map(d => d.trim());
         defectArray.forEach(title => {
             const defRecord = defectsCatalog.find(d => d.titulo === title);
             if (defRecord) {
@@ -184,10 +206,32 @@ export default function RegistroMoldesPage() {
             }
         });
 
-        if (totalDays === 0) return entryDate;
+        if (totalDays <= 0) return entryDate;
 
-        // Simple day addition (could be business days but user just said "sum values")
-        date.setDate(date.getDate() + Math.ceil(totalDays));
+        const holidays = Array.isArray(holidaysData) ? (holidaysData as string[]) : [];
+        let addedDays = 0;
+        let targetDays = Math.ceil(totalDays);
+
+        while (addedDays < targetDays) {
+            date.setDate(date.getDate() + 1);
+            const day = date.getDay(); // 0: Sun, 6: Sat
+            const dateStr = date.toISOString().split('T')[0];
+
+            if (day !== 0 && day !== 6 && !holidays.includes(dateStr)) {
+                addedDays++;
+            }
+        }
+
+        // If the result finally falls on a non-business day (though the loop logic prevents it for addedDays > 0),
+        // we ensure it's pushed to next. (Shouldn't happen with the while logic but for completeness)
+        let finalDay = date.getDay();
+        let finalStr = date.toISOString().split('T')[0];
+        while (finalDay === 0 || finalDay === 6 || holidays.includes(finalStr)) {
+            date.setDate(date.getDate() + 1);
+            finalDay = date.getDay();
+            finalStr = date.toISOString().split('T')[0];
+        }
+
         return date.toISOString().split('T')[0];
     }
 
@@ -357,7 +401,7 @@ export default function RegistroMoldesPage() {
                             <div className="flex flex-wrap items-center gap-4">
                                 {/* Type Selector */}
                                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                                    {['Reparaciones', 'Todos', 'Reparación rápida', 'Reparación especial'].map((v) => (
+                                    {['Todos', 'Reparación rápida', 'Reparación especial'].map((v) => (
                                         <button
                                             key={v}
                                             onClick={() => setFilterView(v)}
@@ -374,16 +418,32 @@ export default function RegistroMoldesPage() {
                             </div>
                         </div>
 
-                        {/* Search Bar */}
+                        {/* Search Bar - Upgraded to Autocomplete pointing to 'moldes' table per Requirement 2.2 */}
                         <div className="mt-10 relative group">
                             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                             <input
                                 type="text"
-                                placeholder="Buscar en BD_moldes (Código, Título, Defectos, Observaciones)..."
+                                placeholder="Escribe para buscar el molde en Maestro 'moldes'..."
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[2rem] py-5 pl-16 pr-8 text-sm font-medium outline-none"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => handleGlobalSearchChange(e.target.value)}
+                                onFocus={() => { if(searchTerm.length >= 2) setShowGlobalResults(true) }}
                             />
+                            {showGlobalResults && globalMoldsResults.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl z-50 p-4 max-h-[400px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
+                                    <h4 className="px-4 py-2 text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Resultados en Maestro 'moldes'</h4>
+                                    {globalMoldsResults.map((m) => (
+                                        <button 
+                                            key={m.id} 
+                                            onClick={() => selectGlobalMold(m)}
+                                            className="w-full text-left p-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-2xl transition-all border-b border-slate-50 dark:border-slate-800 last:border-0 flex flex-col gap-1"
+                                        >
+                                            <span className="text-sm font-black text-slate-900 dark:text-white">{m.serial}</span>
+                                            <span className="text-xs font-bold text-slate-400 uppercase">{m.nombre_articulo}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -496,14 +556,15 @@ export default function RegistroMoldesPage() {
                                             />
                                             {masterMolds.length > 0 && (
                                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 p-2 max-h-60 overflow-y-auto overflow-x-hidden">
+                                                    <h4 className="px-4 py-2 text-[9px] font-black text-amber-500 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-2">Registros en 'BD_moldes'</h4>
                                                     {masterMolds.map((m) => (
                                                         <button 
                                                             key={m.id} 
-                                                            onClick={() => selectMasterMold(m)}
-                                                            className="w-full text-left p-4 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all flex flex-col gap-1 border-b border-slate-50 dark:border-slate-800/50 last:border-0"
+                                                            onClick={() => selectMasterMoldFromBD(m)}
+                                                            className="w-full text-left p-4 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded-xl transition-all flex flex-col gap-1 border-b border-slate-50 dark:border-slate-800/50 last:border-0"
                                                         >
-                                                            <span className="text-xs font-black text-slate-900 dark:text-white">{m.serial}</span>
-                                                            <span className="text-[10px] font-bold text-slate-500 truncate">{m.nombre_articulo}</span>
+                                                            <span className="text-xs font-black text-slate-900 dark:text-white">{m.codigo_molde}</span>
+                                                            <span className="text-[10px] font-bold text-slate-500 truncate">{m.titulo}</span>
                                                         </button>
                                                     ))}
                                                 </div>

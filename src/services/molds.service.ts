@@ -149,6 +149,14 @@ export const moldsService = {
             query = query.or(`"CODIGO MOLDE".ilike.${term},"Título".ilike.${term},"DEFECTOS A REPARAR".ilike.${term},"ESTADO".ilike.${term}`)
         }
 
+        // 2.3 logic: ONLY show active reparative states, EXCLUDE Destruido/Entregado
+        // Including non-accented variants to match real data (e.g. 'En reparacion')
+        query = query.in('"ESTADO"', [
+            'En espera en moldes', 'EN ESPERA EN MOLDES', 'En espera en moldes ',
+            'En reparación', 'En reparacion', 'EN REPARACIÓN', 'EN REPARACION',
+            'En espera en producción', 'En espera en produccion', 'EN ESPERA EN PRODUCCIÓN'
+        ])
+
         if (filters?.repair_type && filters.repair_type !== 'Todos') {
             if (filters.repair_type === 'Reparaciones') {
                 // General repairs view
