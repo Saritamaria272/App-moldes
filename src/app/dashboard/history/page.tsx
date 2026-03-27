@@ -398,28 +398,28 @@ export default function RegistroMoldesPage() {
                                 <p className="text-slate-500 font-medium">Panel consolidado de reparaciones en curso.</p>
                             </div>
                             
-                            <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full lg:w-auto mt-6 lg:mt-0">
                                 {/* Type Selector */}
-                                <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
                                     {['Todos', 'Reparación rápida', 'Reparación especial'].map((v) => (
                                         <button
                                             key={v}
                                             onClick={() => setFilterView(v)}
-                                            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterView === v ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                            className={`flex-1 min-w-[30%] px-2 py-3 md:px-6 md:py-2 rounded-xl text-[9px] md:text-[10px] font-black uppercase transition-all text-center ${filterView === v ? 'bg-white dark:bg-slate-700 text-blue-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                         >
                                             {v}
                                         </button>
                                     ))}
                                 </div>
 
-                                <button onClick={handleCreateClick} className="px-8 py-3.5 bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20 flex items-center gap-3 active:scale-95 transition-all">
-                                    <Package className="w-4 h-4" /> Nuevo Registro
+                                <button onClick={handleCreateClick} className="w-full md:w-auto px-8 py-4 md:py-3.5 bg-blue-500 text-white rounded-2xl font-black text-[11px] md:text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                    <Package className="w-5 h-5 md:w-4 md:h-4" /> Nuevo Registro
                                 </button>
                             </div>
                         </div>
 
                         {/* Search Bar - Upgraded to Autocomplete pointing to 'moldes' table per Requirement 2.2 */}
-                        <div className="mt-10 relative group">
+                        <div className="mt-8 md:mt-10 relative group">
                             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                             <input
                                 type="text"
@@ -458,9 +458,10 @@ export default function RegistroMoldesPage() {
                                         <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Tipo Reparación</th>
                                         <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Defectos & Notas</th>
                                         <th className="py-6 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cronología</th>
+                                        <th className="py-6 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky right-0 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur z-10 text-center border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50">Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 relative">
                                     {records.map((r, i) => (
                                         <tr key={`${r.id}-${i}`} ref={i === records.length - 1 ? lastElementRef : null} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all group">
                                             <td className="py-8 px-10">
@@ -471,37 +472,38 @@ export default function RegistroMoldesPage() {
                                             </td>
                                             <td className="py-8 px-10">
                                                 <span className={`px-4 py-2 rounded-xl text-[9px] font-black border uppercase tracking-widest ${
-                                                    (r.estado || '').includes('reparacion') ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
-                                                    (r.estado || '').includes('Disponible') ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                                                    'bg-slate-100 text-slate-500 border-slate-200'
+                                                    (r.estado || '').includes('reparacion') || (r.estado || '') === 'En reparación' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
+                                                    (r.estado || '').includes('Entregado') || (r.estado || '') === 'Activo' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
+                                                    (r.estado || '').includes('Destruido') || (r.estado || '') === 'Baja' ? 'bg-red-500/10 text-red-600 border-red-500/20' :
+                                                    'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                                                 }`}>
                                                     {r.estado || 'Sin Estado'}
                                                 </span>
                                             </td>
                                             <td className="py-8 px-10 text-center">
-                                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-full text-[9px] font-black uppercase text-slate-500 border border-slate-200 dark:border-slate-700">
+                                                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-full text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                                                     {r.tipo_de_reparacion || 'N/A'}
                                                 </div>
                                             </td>
                                             <td className="py-8 px-10 max-w-[350px]">
                                                 <div className="space-y-1.5">
                                                     <p className="text-xs font-bold text-red-500 leading-relaxed truncate">{r.defectos_a_reparar || '--'}</p>
-                                                    <p className="text-[10px] text-slate-500 italic truncate opacity-70">{r.observaciones}</p>
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic truncate opacity-70">{r.observaciones}</p>
                                                 </div>
                                             </td>
                                             <td className="py-8 px-10">
-                                                <div className="flex items-center justify-between gap-6">
-                                                    <div className="flex flex-col gap-1 min-w-[100px]">
-                                                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-600 dark:text-slate-300">
-                                                            <Calendar className="w-3 h-3 text-blue-500" />
-                                                            {r.fecha_entrada ? r.fecha_entrada : 'S/F'}
-                                                        </div>
-                                                        <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Vence: {r.fecha_esperada || '---'}</div>
+                                                <div className="flex flex-col gap-1 min-w-[100px]">
+                                                    <div className="flex items-center gap-2 text-[10px] font-black text-slate-600 dark:text-slate-300">
+                                                        <Calendar className="w-3 h-3 text-blue-500" />
+                                                        {r.fecha_entrada ? r.fecha_entrada : 'S/F'}
                                                     </div>
-                                                    <button onClick={() => handleEditClick(r)} className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl hover:bg-blue-500 hover:text-white transition-all border border-slate-200 dark:border-slate-700">
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </button>
+                                                    <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Vence: {r.fecha_esperada || '---'}</div>
                                                 </div>
+                                            </td>
+                                            <td className="py-8 px-6 sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50/50 dark:group-hover:bg-slate-800/80 transition-all border-l border-slate-100 dark:border-slate-800 shadow-[-10px_0_15px_-5px_rgba(0,0,0,0.05)] shadow-slate-200/50 dark:shadow-slate-900/50 z-10 text-center align-middle">
+                                                <button onClick={() => handleEditClick(r)} className="p-3.5 bg-slate-100 dark:bg-slate-800 rounded-2xl hover:bg-blue-500 hover:text-white transition-all border border-slate-200 dark:border-slate-700 mx-auto flex shrink-0 group/btn">
+                                                    <Edit2 className="w-4 h-4 text-slate-500 group-hover/btn:text-white dark:text-slate-400" />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}

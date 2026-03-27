@@ -89,10 +89,14 @@ export default function SAPItemsPage() {
             
             // Reusing the frozen filter to filter by status conceptually if needed,
             // but effectively keeping the UI intact.
+            // Determinamos si es activo basado en el campo de usuario 'Estado Molde'
+            const estadoMoldeRaw = (item.U_EstadoMolde || item.U_Estado || item.U_ESTADO || item.U_ESTADO_MOLDE || '').toString().toLowerCase();
+            const esActivo = estadoMoldeRaw === 'activo' || estadoMoldeRaw === 'disponible';
+            
             const matchFrozen =
                 filterFrozen === 'all' ||
-                (filterFrozen === 'active'   && String(item.Status).includes('Available')) ||
-                (filterFrozen === 'inactive' && !String(item.Status).includes('Available'))
+                (filterFrozen === 'active'   && esActivo) ||
+                (filterFrozen === 'inactive' && !esActivo)
             return matchSearch && matchFrozen
         })
     }, [items, search, filterFrozen])
@@ -174,8 +178,14 @@ export default function SAPItemsPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[
                             { label: 'Total Series SAP', value: items.length, icon: Database, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-                            { label: 'Disponibles',  value: items.filter(i => String(i.Status).includes('Available')).length, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20' },
-                            { label: 'Ocupados / Otros', value: items.filter(i => !String(i.Status).includes('Available')).length, icon: XCircle,    color: 'text-red-500',   bg: 'bg-red-50 dark:bg-red-900/20'   },
+                            { label: 'Disponibles (Activos)',  value: items.filter(i => {
+                                const st = (i.U_EstadoMolde || i.U_Estado || i.U_ESTADO || i.U_ESTADO_MOLDE || '').toString().toLowerCase();
+                                return st === 'activo' || st === 'disponible';
+                            }).length, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-900/20' },
+                            { label: 'Inactivos / Otros', value: items.filter(i => {
+                                const st = (i.U_EstadoMolde || i.U_Estado || i.U_ESTADO || i.U_ESTADO_MOLDE || '').toString().toLowerCase();
+                                return st !== 'activo' && st !== 'disponible';
+                            }).length, icon: XCircle,    color: 'text-red-500',   bg: 'bg-red-50 dark:bg-red-900/20'   },
                             { label: 'Con serial', value: items.length, icon: Package, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-900/20' },
                         ].map(c => (
                             <div key={c.label} className={`${c.bg} border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-2 shadow-sm`}>
@@ -243,7 +253,7 @@ export default function SAPItemsPage() {
                                 <table className="w-full text-left min-w-[900px]">
                                     <thead>
                                         <tr className="bg-slate-50 dark:bg-slate-950/30 border-b border-slate-100 dark:border-slate-800">
-                                            {['Número de artículo', 'Descripción', 'Número de serie', 'Estado', 'Estado Molde'].map(h => (
+                                            {['Número de artículo', 'Descripción', 'Número de serie', 'Estado Molde'].map(h => (
                                                 <th key={h} className="py-4 px-5 text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                                             ))}
                                         </tr>
@@ -270,15 +280,7 @@ export default function SAPItemsPage() {
                                                         {item.InternalSerialNumber || item.MfrSerialNo || item.SerialNumber || item.IntrSerial || '—'}
                                                     </span>
                                                 </td>
-                                                <td className="py-4 px-5">
-                                                    <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border whitespace-nowrap ${
-                                                        estado.toLowerCase().includes('available')
-                                                            ? 'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:border-green-700'
-                                                            : 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700'
-                                                    }`}>
-                                                        {estado === 'Available' ? 'Disponible' : estado}
-                                                    </span>
-                                                </td>
+
                                                 <td className="py-4 px-5">
                                                     <span className="text-[10px] font-medium text-slate-500 uppercase whitespace-nowrap">
                                                         {estadoMolde}

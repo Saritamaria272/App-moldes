@@ -62,23 +62,16 @@ export async function POST(req: Request) {
 
         const entity = fetchData.value[0]
 
-        // Determine what property name is being used for the "Estado Molde" 
-        // We fall back across known possible property names we assumed in the frontend
-        const estadoMoldeKey = entity.hasOwnProperty('U_ESTADO_MOLDE') ? 'U_ESTADO_MOLDE' : 
-                               entity.hasOwnProperty('U_ESTADO') ? 'U_ESTADO' : 
-                               entity.hasOwnProperty('U_EstadoMolde') ? 'U_EstadoMolde' : 
-                               entity.hasOwnProperty('U_Estado') ? 'U_Estado' : 'U_ESTADO_MOLDE';
+        // Use the exact identified User-Defined Field
+        const estadoMoldeKey = 'U_EstadoMolde';
 
         const patchData = {
             [estadoMoldeKey]: estado_sap
         }
 
         // 3. Patch the record
-        const systemNumber = entity.SystemNumber
-        const realItemCode = entity.ItemCode
-        // In SAP B1 SL, correct URL is mostly (ItemCode='xxx',SystemNumber=1) or (ItemCode='...',SerialNumber='...')
-        // Trying the SystemNumber approach which is the primary unique auto-increment in B1
-        const patchPath = `/SerialNumberDetails(ItemCode='${realItemCode}',SystemNumber=${systemNumber})`
+        const docEntry = entity.DocEntry;
+        const patchPath = `/SerialNumberDetails(${docEntry})`
         const patchRes = await fetch(`${baseUrl}${patchPath}`, {
             method: 'PATCH',
             headers,

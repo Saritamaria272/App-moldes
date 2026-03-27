@@ -83,11 +83,12 @@ export async function GET() {
             const batch: any[] = page?.value ?? []
             allItems.push(...batch)
 
-            // If we received fewer than PAGE_SIZE, we've reached the last page
-            if (batch.length < PAGE_SIZE) {
+            // Si el lote está vacío, hemos terminado. 
+            // Si no está vacío, avanzamos el "skip" por el tamaño real recibido.
+            if (batch.length === 0) {
                 keepFetching = false
             } else {
-                skip += PAGE_SIZE
+                skip += batch.length
             }
         }
 
