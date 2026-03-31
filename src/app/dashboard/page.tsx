@@ -84,15 +84,7 @@ export default function DashboardPage() {
                         <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Consumo Materia Prima</span>
                     </button>
 
-                    <button
-                        onClick={() => window.location.href = '/dashboard/audit'}
-                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-yellow-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-yellow-500/5 group"
-                    >
-                        <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20 group-hover:scale-110 transition-transform">
-                            <CheckCircle2 className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />
-                        </div>
-                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Auditoría</span>
-                    </button>
+
 
                     <button
                         onClick={() => window.location.href = '/dashboard/indicators'}
@@ -103,15 +95,7 @@ export default function DashboardPage() {
                         </div>
                         <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Indicador</span>
                     </button>
-                    <button
-                        onClick={() => window.location.href = '/dashboard/audit-v2'}
-                        className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-cyan-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-cyan-500/5 group"
-                    >
-                        <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center border border-cyan-500/20 group-hover:scale-110 transition-transform">
-                            <ClipboardList className="w-6 h-6 text-cyan-500 dark:text-cyan-400" />
-                        </div>
-                        <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Auditoría V2</span>
-                    </button>
+
 
                     <button
                         onClick={() => window.location.href = '/dashboard/sap-items'}

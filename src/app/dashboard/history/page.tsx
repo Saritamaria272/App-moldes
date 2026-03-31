@@ -57,6 +57,18 @@ export default function RegistroMoldesPage() {
 
     const searchTimeout = useRef<NodeJS.Timeout | null>(null)
     const observer = useRef<IntersectionObserver | null>(null)
+    const globalResultsRef = useRef<HTMLDivElement>(null)
+
+    // Close global results on escape or click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (globalResultsRef.current && !globalResultsRef.current.contains(event.target as Node)) {
+                setShowGlobalResults(false)
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [])
 
     const lastElementRef = useCallback((node: HTMLTableRowElement) => {
         if (loading || loadingMore) return
@@ -96,6 +108,7 @@ export default function RegistroMoldesPage() {
     const fetchInitial = async (searchVal: string, repairType: string) => {
         setLoading(true)
         setOffset(0)
+        console.log('>>> FETCH INITIAL:', { searchVal, repairType })
         try {
             // "Al ingresar... deben mostrarse únicamente los moldes que estén en estado de reparación"
             const data = await moldsService.getAllRegistros(BATCH_SIZE, 0, searchVal, {
@@ -176,6 +189,7 @@ export default function RegistroMoldesPage() {
     const selectGlobalMold = (m: any) => {
         setSearchTerm(m.serial)
         setShowGlobalResults(false)
+        setGlobalMoldsResults([]) // Clear result to hide box
         // Optionally jump to it by filtering exactly
         fetchInitial(m.serial, filterView)
     }
@@ -430,7 +444,7 @@ export default function RegistroMoldesPage() {
                                 onFocus={() => { if(searchTerm.length >= 2) setShowGlobalResults(true) }}
                             />
                             {showGlobalResults && globalMoldsResults.length > 0 && (
-                                <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl z-50 p-4 max-h-[400px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
+                                <div ref={globalResultsRef} className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-2xl z-[100] p-4 max-h-[400px] overflow-y-auto animate-in slide-in-from-top-2 duration-200">
                                     <h4 className="px-4 py-2 text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Resultados en Maestro 'moldes'</h4>
                                     {globalMoldsResults.map((m) => (
                                         <button 

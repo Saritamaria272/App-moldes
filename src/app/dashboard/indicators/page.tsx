@@ -68,6 +68,7 @@ export default function IndicatorsPage() {
         end:   new Date().toISOString().split('T')[0],
     })
     const [selectedCat, setSelectedCat] = useState('Todos')
+    const [numOperarios, setNumOperarios] = useState<number | ''>('')
 
     useEffect(() => {
         const stored = localStorage.getItem('moldapp_user')
@@ -111,14 +112,21 @@ export default function IndicatorsPage() {
         ).length
 
         const pendientes = filteredComp.filter(r => !r.fecha_entrega).length
+        
+        // Productividad calculation
+        const numOps = typeof numOperarios === 'number' ? numOperarios : 0
+        const productividad = (numOps > 0) ? (entregadosEnRango / numOps) : 0
+
         return {
             comprometidos:      total,
             entregadosEnRango,  // shown in card 2 (informativo)
             cumplieron,         // used for nivel de servicio
             pendientes,
             nivel: total > 0 ? (cumplieron / total) * 100 : 0,
+            productividad,
+            hasOps: numOps > 0
         }
-    }, [filteredComp, filteredEntr])
+    }, [filteredComp, filteredEntr, numOperarios])
 
     // ── Build unified table: union of A ∪ B, deduplicated ────────────────────
     const tableRows = useMemo((): TableRow[] => {
@@ -178,6 +186,23 @@ export default function IndicatorsPage() {
                                 />
                             </div>
                         ))}
+                        <div className="space-y-1.5 ml-0 md:ml-4">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                                Número de operarios
+                            </label>
+                            <input
+                                type="number"
+                                min="1"
+                                placeholder="Ejem: 4"
+                                className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-5 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30 w-32"
+                                value={numOperarios}
+                                onChange={e => {
+                                    const val = e.target.value === '' ? '' : parseInt(e.target.value)
+                                    setNumOperarios(val as number | '')
+                                }}
+                            />
+                        </div>
+
                         <button
                             onClick={() => loadStats()}
                             className="ml-auto px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-600/20 text-[10px] uppercase tracking-[0.2em]"
@@ -211,8 +236,8 @@ export default function IndicatorsPage() {
                     </div>
                 ) : stats && (
                     <>
-                        {/* ── 4 KPI cards ──────────────────────────────────── */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {/* ── 5 KPI cards ──────────────────────────────────── */}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                             {/* Comprometidos */}
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-2 shadow-sm">
                                 <CalendarDays className="w-5 h-5 text-blue-500" />
@@ -233,6 +258,26 @@ export default function IndicatorsPage() {
                                 <p className={`text-3xl font-black ${gc.text}`}>{Math.round(kpis.nivel)}%</p>
                                 <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-tight">Nivel de servicio</p>
                                 <p className="text-[8px] text-slate-400">{kpis.cumplieron} cumplieron / {kpis.comprometidos} comprometidos</p>
+                            </div>
+                            {/* Productividad - NEW */}
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-2 shadow-sm relative overflow-hidden">
+                                <Zap className="w-5 h-5 text-emerald-500" />
+                                <div className="space-y-1">
+                                    {kpis.hasOps ? (
+                                        <>
+                                            <p className="text-3xl font-black text-emerald-600">{Number(kpis.productividad.toFixed(1))}</p>
+                                            <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest leading-tight">Productividad</p>
+                                            <p className="text-[8px] text-slate-400">{Number(kpis.productividad.toFixed(1))} moldes por operario por día</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm font-black text-amber-500 uppercase py-2">Ingresar operarios</p>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">Productividad</p>
+                                            <p className="text-[8px] text-slate-400">Falta dato de personal</p>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-bl-full -mr-4 -mt-4"></div>
                             </div>
                             {/* Active category */}
                             <div className={`border rounded-2xl p-6 space-y-2 shadow-sm ${col.softBg} ${col.border}`}>

@@ -138,6 +138,7 @@ export const moldsService = {
     // Module: REGISTRO MOLDES (public."BD_moldes")
     async getRegistroMoldes(limit = 50, offset = 0, search = '', filters?: any) {
         const supabase = createClient()
+        console.log('--- FETCHING BD_moldes ---', { limit, offset, search, filters })
         // New exact column names: "FECHA ENTRADA", "Título", "CODIGO MOLDE", "DEFECTOS A REPARAR", "ESTADO"
         let query = supabase
             .from('BD_moldes')
@@ -150,26 +151,28 @@ export const moldsService = {
         }
 
         // 2.3 logic: ONLY show active reparative states, EXCLUDE Destruido/Entregado
-        // Including non-accented variants to match real data (e.g. 'En reparacion')
-        query = query.in('"ESTADO"', [
-            'En espera en moldes', 'EN ESPERA EN MOLDES', 'En espera en moldes ',
+        // Including non-accented variants and common variants to match real data (e.g. 'En espera - Produccion')
+        query = query.in('ESTADO', [
+            'En espera en moldes', 'EN ESPERA EN MOLDES', 'En espera moldes', 'En espera - Moldes',
             'En reparación', 'En reparacion', 'EN REPARACIÓN', 'EN REPARACION',
-            'En espera en producción', 'En espera en produccion', 'EN ESPERA EN PRODUCCIÓN'
+            'En espera en producción', 'En espera en produccion', 'EN ESPERA EN PRODUCCIÓN',
+            'En espera producción', 'En espera produccion', 'En espera - Producción', 'En espera - Produccion'
         ])
 
         if (filters?.repair_type && filters.repair_type !== 'Todos') {
-            if (filters.repair_type === 'Reparaciones') {
+            const rt = filters.repair_type.toLowerCase();
+            if (rt === 'reparaciones') {
                 // General repairs view
                 query = query.or(`"ESTADO".ilike.%reparacion%,"Tipo de reparacion".ilike.%reparacion%,"Tipo de reparacion".ilike.%rapida%,"Tipo de reparacion".ilike.%especial%`)
-            } else if (filters.repair_type.toLowerCase().includes('rapida')) {
+            } else if (rt.includes('rapida') || rt.includes('rápida')) {
                 // Specific: Rapida
-                query = query.ilike('"Tipo de reparacion"', '%rapida%')
-            } else if (filters.repair_type.toLowerCase().includes('especial')) {
+                query = query.ilike('Tipo de reparacion', '%rapida%')
+            } else if (rt.includes('especial')) {
                 // Specific: Especial
-                query = query.ilike('"Tipo de reparacion"', '%especial%')
+                query = query.ilike('Tipo de reparacion', '%especial%')
             } else {
                 // Other exact matches
-                query = query.eq('"Tipo de reparacion"', filters.repair_type)
+                query = query.eq('Tipo de reparacion', filters.repair_type)
             }
         }
 

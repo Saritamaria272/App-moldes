@@ -112,7 +112,7 @@ export default function RawMaterialConsumption() {
 
             // Prepare record for public."Entradas_salidas_MP"
             const finalRecord = {
-                'id': undefined, // id is SERIAL PK, always create new
+                // id is auto-generated
                 'Título': formData.titulo,
                 'CODIGO MP': formData.codigo_mp,
                 'CANTIDAD': formData.cantidad,
@@ -122,11 +122,12 @@ export default function RawMaterialConsumption() {
                 'MP MOLDE CODIGO': formData.mp_molde_codigo,
                 'CONCEPTO': formData.concepto,
                 'OBSERVACIONES': formData.observaciones,
-                'MOLDE RELACIONADO': formData.relacion_molde,
                 'Created': now,
                 'Usuario': usuarioStr,
+                'SAP': 'Pendiente', // SAP sync field
                 'Modified': now,
-                'Modified By': usuarioStr
+                'Modified By': usuarioStr,
+                'MOLDE RELACIONADO': formData.relacion_molde
             }
 
             await moldsService.saveRawMaterialMovement(finalRecord)
@@ -257,14 +258,6 @@ export default function RawMaterialConsumption() {
                            <div className="space-y-2">
                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Unidad Origen (UNDS)</p>
                                <div className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase">{formData.unds || '---'}</div>
-                           </div>
-                           <div className="space-y-2">
-                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">MP Molde Relacionado</p>
-                               <div className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase truncate">{formData.mp_molde || '---'}</div>
-                           </div>
-                           <div className="space-y-2">
-                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Código Molde SAP</p>
-                               <div className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase font-mono">{formData.mp_molde_codigo || '---'}</div>
                            </div>
                         </div>
                     </div>
