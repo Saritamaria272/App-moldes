@@ -32,6 +32,58 @@ export const moldsService = {
         return data
     },
 
+    // SEARCH: Buscador Rápido (Dashboard) connects to BD_moldes (Requirement 2.4 / 2.3)
+    async searchMolds(query: string) {
+        if (!query.trim()) return []
+        const supabase = createClient()
+        const term = `%${query.trim()}%`
+        
+        // Search in BD_moldes using provided table schema
+        const { data, error } = await supabase
+            .from('BD_moldes')
+            .select('*')
+            .or(`"Título".ilike.${term},"CODIGO MOLDE".ilike.${term}`)
+            .limit(10)
+            
+        if (error) {
+            console.error('Error in searchMolds:', error.message)
+            return []
+        }
+        
+        // Return mapped records for MoldSearch component (serial, nombre_articulo, estado)
+        return (data || []).map((m: any) => ({
+            ...m,
+            id: m.id,
+            serial: m["CODIGO MOLDE"] || 'S/C',
+            nombre_articulo: m["Título"] || 'Sin Título',
+            estado: m["ESTADO"] || 'Sin Estado',
+            
+            // Inclusion for AddMoldModal compatibility
+            Fecha_de_ingreso: m["FECHA ENTRADA"],
+            Fecha_esperada: m["FECHA ESPERADA"],
+            Fecha_de_entrega: m["FECHA ENTREGA"],
+            Responsable: m["Responsable"],
+            Tipo_de_reparacion: m["Tipo de reparacion"],
+            Observaciones_reparacion: m["OBSERVACIONES"]
+        }))
+    },
+
+    // ALIAS: For compatibility with AddMoldModal (Dashboard)
+    async saveMold(record: any) {
+        return this.saveRegistro({
+            ...record,
+            titulo: record.nombre_articulo,
+            codigo_molde: record.serial,
+            fecha_entrada: record.Fecha_de_ingreso,
+            fecha_esperada: record.Fecha_esperada,
+            fecha_entrega: record.Fecha_de_entrega,
+            observaciones: record.Observaciones_reparacion || record.observaciones,
+            responsable: record.Responsable,
+            tipo_de_reparacion: record.Tipo_de_reparacion,
+            usuario: record.modificado_por
+        }, (!record.id || record.id === 'NEW' || record.id === 0))
+    },
+
     // SEARCH: Registro Moldes module uses BD_moldes for searching/autocomplete
     async searchRegistroMoldes(query: string) {
         if (!query.trim()) return []

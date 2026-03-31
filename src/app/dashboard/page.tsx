@@ -84,8 +84,6 @@ export default function DashboardPage() {
                         <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Consumo Materia Prima</span>
                     </button>
 
-
-
                     <button
                         onClick={() => window.location.href = '/dashboard/indicators'}
                         className="p-6 glass-card rounded-2xl border border-black/5 dark:border-white/5 hover:border-red-500/30 transition-all group flex flex-col items-center justify-center text-center gap-4 bg-gradient-to-b hover:from-red-500/5 group"
@@ -95,7 +93,6 @@ export default function DashboardPage() {
                         </div>
                         <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Indicador</span>
                     </button>
-
 
                     <button
                         onClick={() => window.location.href = '/dashboard/sap-items'}
@@ -107,14 +104,6 @@ export default function DashboardPage() {
                         <span className="text-sm font-bold tracking-wide text-slate-800 dark:text-white">Estado Molde SAP</span>
                     </button>
                 </div>
-
-                <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-6 px-4">
-                        <div className="w-1 h-6 bg-blue-500 rounded-full"></div>
-                        <h2 className="text-xl font-bold">Buscador Rápido</h2>
-                    </div>
-                    <MoldSearch onSelect={(mold) => setSelectedMold(mold)} />
-                </div>
             </div>
 
             {selectedMold && (
@@ -123,7 +112,6 @@ export default function DashboardPage() {
                     onClose={() => setSelectedMold(null)}
                     onSuccess={() => {
                         setSelectedMold(null)
-                        // Optionally refresh data if needed
                     }}
                 />
             )}
